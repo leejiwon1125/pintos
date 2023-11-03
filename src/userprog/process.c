@@ -20,6 +20,7 @@
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+static void put_args_into_user_stack(void **esp, int argc, char **argv);
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -50,16 +51,42 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-  char *file_name = file_name_;
+  char *file_name = file_name_;//this contains all command line ex: "foo -a -l"
   struct intr_frame if_;
   bool success;
+  //lab2 added
+  // 0. make variable to use for parsing
+  char *argv[100]; //max argument numebr is 100
+  int argc=0;
+  char *one_word;
+  char *remaining_words;
+  char *file_name_for_parsing;
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  // parsing do here - 함수로 하려고했는데 argv랑 argc랑 같이 필요해서 여기서 함.
+  // 1. make file name for parsing
+  file_name_for_parsing = (char *) malloc((strlen(file_name)+1) * sizeof(char));
+  strlcpy(file_name_for_parsing, file_name, (strlen(file_name)+1) * sizeof(char));
+  // 2. do parse 
+  for (one_word=strtok_r (file_name_for_parsing, " ", &remaining_words); one_word != NULL; one_word =strtok_r (NULL, " ", &remaining_words))
+  {
+    argv[argc++] = one_word;
+  }  
+
+  // 3. pass only exe file name into load
+  success = load (argv[0], &if_.eip, &if_.esp);
+  // 4. if load is done, it's time to set up user stack using parsed command line
+  if(success)
+  {
+    ASSERT(if_.esp == PHYS_BASE);
+    put_args_into_user_stack(&if_.esp, argc, argv);
+  }
+  // 5. argv[0] is copied in load function, argv[1~argc-1] is copied in user stack so its safe to free memory. 
+  free(file_name_for_parsing);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -74,6 +101,41 @@ start_process (void *file_name_)
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
+}
+
+void put_args_into_user_stack(void **esp, int argc, char **argv)
+{
+  int i;
+  //push real text into stack
+  for (i = argc - 1; i >= 0; i--)
+  {
+    *esp -= (strlen(argv[i]) + 1);
+    memcpy(*esp, argv[i], (strlen(argv[i]) + 1));//used memcpy so we can free the argv in caller function of put_args_into~
+    argv[i] = (uint32_t *)*esp;
+  }
+
+  //for word-align  
+  *esp = (void*)((uint32_t)(*esp) & 0xfffffffc);
+  //mark argv[argc] to '0' into stack
+  *esp -= 4;
+  *(uint32_t *)*esp = 0;
+  //push argv[i] into stack
+  for (i = argc - 1; i>= 0; i--)
+  {
+    *esp -= 4;
+    *(uint32_t **)*esp = argv[i];
+  }
+  //push 'argv'
+  *esp -= 4;
+  *(uint32_t **)*esp = *esp + 4;
+  //push 'argc'
+  *esp -= 4;
+  *(uint32_t *)*esp = argc;
+  //push 'fake return address'
+  *esp -= 4;
+  *(uint32_t *)*esp = 0;
+
+  return;
 }
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -206,8 +268,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
+load (const char *file_name_, void (**eip) (void), void **esp) 
 {
+  const char *file_name = file_name_;//save locally
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
