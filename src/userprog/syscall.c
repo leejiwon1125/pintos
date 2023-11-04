@@ -153,7 +153,22 @@ void
 exit (int status)
 {
   struct thread * t = thread_current ();
+  struct process * cur_process; //current process in the view of parent
+  struct list * parent_s_child_list = &(t->parent->child_list);
+  struct list_elem * e;
+
+  //1. save status into tcb
   t->exit_status = status;
+  //2. update exit_status info to parent's child list : this is needed because we use other then struct thread 
+  for (e = list_begin(parent_s_child_list); e != list_end(parent_s_child_list); e = list_next(e))
+  {
+    cur_process = list_entry(e,struct process, elem_p);
+    if (cur_process->thread_info_p->tid == t->tid)
+    {
+      cur_process->exit_status_p = status;
+      break;
+    }
+  }
   printf ("%s: exit(%d)\n", t->name, status);
   thread_exit ();  // thread_exit -> process_exit : free resource
 }

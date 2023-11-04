@@ -112,13 +112,19 @@ struct thread
     bool is_child_load_success;
 
     // for parent-child relation
-    struct list child_list; // struct thread will be element of this list
-    struct list_elem elem_child;
+    struct list child_list; // struct process will be element of this list
     struct thread * parent;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+struct process
+  {
+    struct thread * thread_info_p;
+    int exit_status_p;
+    struct list_elem elem_p;
+  }
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

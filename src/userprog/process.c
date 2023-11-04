@@ -168,32 +168,16 @@ process_wait (tid_t child_tid)
 
   // case3: process_wait has already called
 
-  // case4: waiting case
+  // case4: normal case
 
   struct thread * cur = thread_current ();
-  struct thread * child_tcb_to_wait = NULL;
-  struct list_elem * e = NULL;
-  struct thread * t;
+  struct process * child_pcb_to_wait = NULL;
+  struct list_elem * e;
+  struct process * p;
+  int child_exit_status;
   
   //case 2
   if (list_empty(&(cur->child_list)))
-  {
-    return -1;
-  }
-
-  e = list_begin(&(cur->child_list));
-  while (e != list_end(&(cur->child_list)))
-  {
-    t = list_entry(e,struct thread, elem_child);
-    if (t->tid == child_tid)
-    {
-      child_tcb_to_wait = t;
-      break;
-    }
-    e = list_next(e);
-  }
-  //case 2
-  if (child_tcb_to_wait == NULL)
   {
     return -1;
   }
@@ -203,22 +187,40 @@ process_wait (tid_t child_tid)
     return -1;
   }
 
+  // try to find waiting process
+  e = list_begin(&(cur->child_list));
+  while (e != list_end(&(cur->child_list)))
+  {
+    p = list_entry(e, struct process, elem_p);
+    if (p->thread_info_p->tid == child_tid)
+    {
+      child_pcb_to_wait = p;
+      break;
+    }
+    e = list_next(e);
+  }
+  //case 2
+  if (child_pcb_to_wait == NULL)
+  {
+    return -1;
+  }
+
   // record waiting_child_pid for process_exit and case 3
   cur->waiting_child_pid = child_tid;
 
-  if (child_tcb_to_wait->exit_status == INIT_EXIT_STATUS)
+  //case 4 : exit_status in struct process is equal with its in struct thread / exit_status == INIT~ mean not yet exited
+  if (child_pcb_to_wait->exit_status_p == INIT_EXIT_STATUS) // it is good to use 'while' when using semaphore, but thie case, 'if' is okay
   {
     sema_down (&(cur->sema_child_exit));
   }
-  list_remove(&(child_tcb_to_wait->elem_child)); // TODO: add list_push_back in process_exec: the time when parent and child relation is built
+  cur->waiting_child_pid = -1;
+  list_remove(&(child_pcb_to_wait->elem_p)); // TODO: add list_push_back in process_exec: the time when parent and child relation is built
   
-  // the tcb could be removed so we have to save child process's information
-  return 
+  // the tcb could be removed so we have to save child process's information -> now its okay
+  child_exit_status = child_pcb_to_wait->exit_status_p;
+  free(child_pcb_to_wait);
 
-
-
-
-  
+  return child_exit_status;
 }
 
 /* Free the current process's resources. */
@@ -227,13 +229,21 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-
+  struct list_elem * e;
+  struct process * p;
   // lab2 added
+
+  // free child_list's element
+  while (!list_empty(&(cur->child_list)))
+  {
+    e = list_pop_front (&(cur->child_list));
+    p = list_entry(e, struct process, elem_p);
+    free(p);
+  }
 
   // if parent is waiting for 'cur' thread to exit, signal to parent
   if (cur->parent->waiting_child_pid == cur->tid)
   {
-    cur->waiting_child_pid = -1;
     sema_up (&(cur->parent->sema_child_exit));
   }
   /* Destroy the current process's page directory and switch back
