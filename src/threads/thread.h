@@ -101,7 +101,20 @@ struct thread
     uint32_t *pagedir;                  /* Page directory. */
 #endif
     //lab2 added
+    
+    // for exit
     int exit_status;
+    struct semaphore sema_child_exit;
+    tid_t waiting_child_pid;
+    
+    // for exec
+    struct semaphore sema_child_exec;
+    bool is_child_load_success;
+
+    // for parent-child relation
+    struct list child_list; // struct thread will be element of this list
+    struct list_elem elem_child;
+    struct thread * parent;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

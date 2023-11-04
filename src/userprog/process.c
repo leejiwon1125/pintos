@@ -160,9 +160,65 @@ void put_args_into_user_stack(void **esp, int argc, char **argv)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  return -1;
+  // case1: child_tid was terminated by the kernel -> process_exit handles this case
+
+  // case2: child_tid is invalid || chil_tid is not child of calling process
+
+  // case3: process_wait has already called
+
+  // case4: waiting case
+
+  struct thread * cur = thread_current ();
+  struct thread * child_tcb_to_wait = NULL;
+  struct list_elem * e = NULL;
+  struct thread * t;
+  
+  //case 2
+  if (list_empty(&(cur->child_list)))
+  {
+    return -1;
+  }
+
+  e = list_begin(&(cur->child_list));
+  while (e != list_end(&(cur->child_list)))
+  {
+    t = list_entry(e,struct thread, elem_child);
+    if (t->tid == child_tid)
+    {
+      child_tcb_to_wait = t;
+      break;
+    }
+    e = list_next(e);
+  }
+  //case 2
+  if (child_tcb_to_wait == NULL)
+  {
+    return -1;
+  }
+  //case 3
+  if (cur->waiting_child_pid == child_tid)
+  {
+    return -1;
+  }
+
+  // record waiting_child_pid for process_exit and case 3
+  cur->waiting_child_pid = child_tid;
+
+  if (child_tcb_to_wait->exit_status == INIT_EXIT_STATUS)
+  {
+    sema_down (&(cur->sema_child_exit));
+  }
+  list_remove(&(child_tcb_to_wait->elem_child)); // TODO: add list_push_back in process_exec: the time when parent and child relation is built
+  
+  // the tcb could be removed so we have to save child process's information
+  return 
+
+
+
+
+  
 }
 
 /* Free the current process's resources. */
@@ -172,6 +228,14 @@ process_exit (void)
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
+  // lab2 added
+
+  // if parent is waiting for 'cur' thread to exit, signal to parent
+  if (cur->parent->waiting_child_pid == cur->tid)
+  {
+    cur->waiting_child_pid = -1;
+    sema_up (&(cur->parent->sema_child_exit));
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

@@ -143,24 +143,31 @@ syscall_handler (struct intr_frame *f UNUSED)
 }
 
 
-void halt (void)
+void 
+halt (void)
 {
   shutdown_power_off ();
 }
 
-void exit (int status)
+void 
+exit (int status)
 {
-  
+  struct thread * t = thread_current ();
+  t->exit_status = status;
+  printf ("%s: exit(%d)\n", t->name, status);
+  thread_exit ();  // thread_exit -> process_exit : free resource
 }
 
-int exec (const char *file)
+int 
+exec (const char *cmd_line)
 {
-
+  return process_execute (cmd_line);
 }
 
-int wait (int)
+int 
+wait (int pid)
 {
-
+  return process_wait (pid);
 }
 /*
 bool create (const char *file, unsigned initial_size);
