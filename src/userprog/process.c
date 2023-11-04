@@ -31,16 +31,28 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  //lab2 added
+  char * file_name_copy;
+  char * file_name_without_args;
+  char * only_args;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page (0);
+  fn_copy = palloc_get_page (0); //allocate in kernel pool
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  //lab2 added - have to omit arguments
+
+  file_name_copy = (char *) malloc((strlen(fn_copy)+1) * sizeof(char));
+  strlcpy(file_name_copy, fn_copy, (strlen(fn_copy)+1) * sizeof(char));
+  file_name_without_args = strtok_r(file_name_copy, " ", &only_args);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name_without_args, PRI_DEFAULT, start_process, fn_copy);
+  free(file_name_copy);
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -285,6 +297,7 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   process_activate ();
 
   /* Open executable file. */
+  lock_acquire(&filesys_lock);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -376,6 +389,7 @@ load (const char *file_name_, void (**eip) (void), void **esp)
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  lock_release(&filesys_lock);
   return success;
 }
 
