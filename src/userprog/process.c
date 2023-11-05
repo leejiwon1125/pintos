@@ -8,6 +8,7 @@
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
+#include "userprog/syscall.h"
 #include "filesys/directory.h"
 #include "filesys/file.h"
 #include "filesys/filesys.h"
@@ -232,6 +233,11 @@ process_exit (void)
   struct list_elem * e;
   struct process * p;
   // lab2 added
+
+  if (cur->exit_status == INIT_EXIT_STATUS) //case 1 in process_wait
+  {
+    exit(-1); //inform parent to it is abnormal process_exit. its svae to call exit because main logic on thread_exit not yet occured.
+  }
 
   // free child_list's element
   while (!list_empty(&(cur->child_list)))
