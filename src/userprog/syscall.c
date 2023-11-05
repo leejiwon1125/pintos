@@ -252,7 +252,7 @@ open (const char *file)
   }
 
   // protect next_fd_number and fd_list: use lock
-  //lock_acquire(&(cur->fd_number_lock));
+  lock_acquire(&(cur->fd_number_lock));
   
   fd->fd_number = cur->next_fd_number;
   (cur->next_fd_number)++;
@@ -261,7 +261,7 @@ open (const char *file)
 
   list_push_back(&(cur->fd_list),&(fd->elem_f));
 
-  //lock_release(&(cur->fd_number_lock));
+  lock_release(&(cur->fd_number_lock));
   
   return fd->fd_number;
 

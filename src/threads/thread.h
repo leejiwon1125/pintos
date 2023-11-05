@@ -118,7 +118,7 @@ struct thread
     // for file handling
     struct list fd_list; // struct file_desc will be element of this list
     int next_fd_number;
-    //struct lock fd_number_lock;
+    struct lock fd_number_lock;
 
     // for denying write to executables
     struct file * executing_file;
