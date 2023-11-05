@@ -120,6 +120,9 @@ struct thread
     int next_fd_number;
     //struct lock fd_number_lock;
 
+    // for denying write to executables
+    struct file * executing_file;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

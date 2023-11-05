@@ -264,13 +264,18 @@ process_exit (void)
     e_file = list_next(e_file);    
   }
 
-
   // free child_list's element
   while (!list_empty(&(cur->child_list)))
   {
     e = list_pop_front (&(cur->child_list));
     p = list_entry(e, struct process, elem_p);
     free(p);
+  }
+
+  if (cur -> executing_file)
+  {
+    file_allow_write(cur->executing_file);
+    file_close(cur->executing_file);
   }
 
   // if parent is waiting for 'cur' thread to exit, signal to parent
@@ -405,6 +410,8 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   /* Open executable file. */
   lock_acquire(&filesys_lock);
   file = filesys_open (file_name);
+  file_deny_write(file);
+  t->executing_file = file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
@@ -494,7 +501,7 @@ load (const char *file_name_, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
-  file_close (file);
+  // file_close (file);
   lock_release(&filesys_lock);
   return success;
 }
