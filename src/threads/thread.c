@@ -198,6 +198,13 @@ thread_create (const char *name, int priority,
   sf->eip = switch_entry;
   sf->ebp = 0;
 
+  // lab2 added
+  struct process * child_pcb = malloc(sizeof(*child_pcb));
+  child_pcb->thread_info_p = t;
+  child_pcb->exit_status_p = INIT_EXIT_STATUS;
+  ASSERT(child_pcb->thread_info_p->parent == thread_current());
+  list_push_back(&(thread_current()->child_list), &(child_pcb->elem_p));
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -466,6 +473,14 @@ init_thread (struct thread *t, const char *name, int priority)
 
   // lab2 added 
   t->exit_status = INIT_EXIT_STATUS;
+  sema_init(&(t->sema_child_exit),0);
+  t->waiting_child_pid = -1;
+
+  sema_init(&(t->sema_child_exec),0);
+  t->is_child_load_success = false;
+
+  list_init(&(t->child_list));
+  t->parent = running_thread (); // due to main thread creation: main thread is not real thread by the beginning.
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
