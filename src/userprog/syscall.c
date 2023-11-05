@@ -122,7 +122,7 @@ syscall_handler (struct intr_frame *f UNUSED)
       // f->esp+4 == address of 'char * file' in "stack". 
       // we have to check_address not just stack's address
       // but also char * file 's pointing address.
-      check_address (*(char **)(f->esp +4),sizeof(char*)); 
+      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
 
       f->eax = create (
           *(const char **)(f->esp + 4),
@@ -134,12 +134,16 @@ syscall_handler (struct intr_frame *f UNUSED)
     {
       check_address (f->esp + 4, sizeof(char*));
 
+      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
+
       f->eax = remove (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_OPEN:
     {
       check_address (f->esp + 4, sizeof(char*));
+
+      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
 
       f->eax = open (*(const char **)(f->esp + 4));
       break;
@@ -157,6 +161,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address (f->esp + 8,sizeof(void*));
       check_address (f->esp + 12,sizeof(unsigned));
 
+      check_address (*(void **)(f->esp + 8), sizeof(void*)); 
+
       f->eax = read (
           *(int *)(f->esp + 4),
           *(void **)(f->esp + 8) ,
@@ -169,6 +175,8 @@ syscall_handler (struct intr_frame *f UNUSED)
       check_address (f->esp + 4,sizeof(int));
       check_address (f->esp + 8,sizeof(void*));
       check_address (f->esp + 12,sizeof(unsigned));
+
+      check_address (*(void **)(f->esp + 8), sizeof(void*)); 
 
       f->eax = write (
           *(int *)(f->esp + 4),
