@@ -482,6 +482,9 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init(&(t->child_list));
   t->parent = running_thread (); // due to main thread creation: main thread is not real thread by the beginning.
 
+  list_init(&(t->fd_list));
+  t->next_fd_number = 2;
+
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);

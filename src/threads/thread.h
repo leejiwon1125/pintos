@@ -115,6 +115,10 @@ struct thread
     struct list child_list; // struct process will be element of this list
     struct thread * parent;
 
+    // for file handling
+    struct list fd_list; // struct file_desc will be element of this list
+    int next_fd_number;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -124,7 +128,14 @@ struct process
     struct thread * thread_info_p;
     int exit_status_p;
     struct list_elem elem_p;
-  }
+  };
+
+struct file_desc
+  {
+    int fd_number;
+    struct file *opened_file;
+    struct list_elem elem_f;
+  };
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
