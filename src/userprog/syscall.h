@@ -2,7 +2,7 @@
 #define USERPROG_SYSCALL_H
 
 void syscall_init (void);
-
+#include <stdbool.h>
 #endif /* userprog/syscall.h */
 
 //typedef int pid_t;
@@ -10,7 +10,7 @@ void syscall_init (void);
 void halt (void);
 void exit (int status);
 int exec (const char *file);
-int wait (int);
+int wait (int pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
