@@ -17,6 +17,18 @@ syscall_init (void)
 static void 
 check_address (const void *addr, unsigned size)
 {
+  int i;
+
+  // case 1: null pointer
+  for (i=0;i<size;i++)
+  {
+    if ( (addr+i) == NULL )
+    {
+      exit(-1);
+    }
+  }
+  
+  // case 2: outside of 0x08048000 ~ PHYS_BASE
   if(addr >= PHYS_BASE || addr < (void*)(0x08048000) )
   {
     exit(-1);
@@ -26,8 +38,16 @@ check_address (const void *addr, unsigned size)
   {
     exit(-1);
   }
-  
 
+  // case 3: unmapped
+  for (i=0; i<size; i++)
+  {
+    if(lookup_page(thread_current()->pagedir, addr+i, false) == NULL) //lookup_page returns null pointer if addr is unmapped
+    {
+      exit(-1);
+    }
+  }
+    
 }
 
 static struct file_desc *
