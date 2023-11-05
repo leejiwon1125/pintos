@@ -15,12 +15,19 @@ syscall_init (void)
 }
 
 static void 
-check_address (const void *addr)
+check_address (const void *addr, unsigned size)
 {
   if(addr >= PHYS_BASE || addr < (void*)(0x08048000) )
   {
     exit(-1);
   }
+
+  if((addr+size-1) >= PHYS_BASE || (addr+size-1) < (void*)(0x08048000) )
+  {
+    exit(-1);
+  }
+  
+
 }
 
 static struct file_desc *
@@ -56,7 +63,7 @@ get_file_desc(struct thread * t, int fd_number)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  check_address (f->esp);
+  check_address (f->esp, 4);
   
   switch (*(uint32_t *) (f->esp)) // syscall number
   {
@@ -67,29 +74,29 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_EXIT:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4, sizeof(int));
 
       exit (*(int *)(f->esp + 4));
       break;
     }
     case SYS_EXEC:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4, sizeof(char*));
 
       f->eax = exec (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_WAIT:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4, sizeof(int));
 
       f->eax = wait (*(int *)(f->esp + 4)); //pid_t == int
       break;
     }
     case SYS_CREATE:
     {
-      check_address (f->esp + 4);
-      check_address (f->esp + 8);
+      check_address (f->esp + 4, sizeof(char*));
+      check_address (f->esp + 8, sizeof(unsigned));
 
       f->eax = create (
           *(const char **)(f->esp + 4),
@@ -99,30 +106,30 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_REMOVE:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4, sizeof(char*));
 
       f->eax = remove (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_OPEN:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4, sizeof(char*));
 
       f->eax = open (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_FILESIZE:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4,sizeof(int));
 
       f->eax = filesize (*(int *)(f->esp + 4));
       break;
     }
     case SYS_READ:
     {
-      check_address (f->esp + 4);
-      check_address (f->esp + 8);
-      check_address (f->esp + 12);
+      check_address (f->esp + 4,sizeof(int));
+      check_address (f->esp + 8,sizeof(void*));
+      check_address (f->esp + 12,sizeof(unsigned));
 
       f->eax = read (
           *(int *)(f->esp + 4),
@@ -133,9 +140,9 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_WRITE:
     {
-      check_address (f->esp + 4);
-      check_address (f->esp + 8);
-      check_address (f->esp + 12);
+      check_address (f->esp + 4,sizeof(int));
+      check_address (f->esp + 8,sizeof(void*));
+      check_address (f->esp + 12,sizeof(unsigned));
 
       f->eax = write (
           *(int *)(f->esp + 4),
@@ -146,8 +153,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_SEEK:
     {
-      check_address (f->esp + 4);
-      check_address (f->esp + 8);
+      check_address (f->esp + 4, sizeof(int));
+      check_address (f->esp + 8, sizeof(unsigned));
 
       seek (
           *(int *)(f->esp + 4),
@@ -157,14 +164,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_TELL:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4,sizeof(int));
 
       f->eax = tell (*(int *)(f->esp + 4));
       break;
     }
     case SYS_CLOSE:
     {
-      check_address (f->esp + 4);
+      check_address (f->esp + 4,sizeof(int));
 
       close (*(int *)(f->esp +  4));
       break;
