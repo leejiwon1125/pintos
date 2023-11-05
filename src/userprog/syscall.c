@@ -23,6 +23,36 @@ check_address (const void *addr)
   }
 }
 
+static struct file_desc *
+get_file_desc(struct thread * t, int fd_number)
+{
+  struct list * fd_list = &(t->fd_list);
+  struct list_elem * e;
+  struct file_desc * e_f;
+
+  // no such fd_number in thread t
+  if (list_empty(fd_list))
+  {
+    return NULL;
+  }
+
+  // try to find fd_number
+  e = list_begin(fd_list);
+  while(e != list_end(fd_list))
+  {
+    e_f = list_entry(e, struct file_desc, elem_f);
+    if(e_f->fd_number == fd_number)
+    {
+      return e_f;
+    }
+    e = list_next(e);
+  }
+
+  // no such fd_number in thread t
+  return NULL;
+
+}
+
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
@@ -188,25 +218,70 @@ wait (int pid)
 bool 
 create (const char *file, unsigned initial_size)
 {
-  
+  bool success;
+  lock_acquire(&filesys_lock);
+  success = filesys_create (file, initial_size);
+  lock_release(&filesys_lock);
+  return success;
 }
 
 bool 
 remove (const char *file)
 {
-
+  bool success;
+  lock_acquire(&filesys_lock);
+  success = filesys_remove(file);
+  lock_release(&filesys_lock);
+  return success;
 }
 
 int 
 open (const char *file)
 {
+  struct file_desc * fd = malloc(sizeof(*fd)); 
+  struct thread * cur = thread_current ();
+  struct file * opened_file;
+  
+  lock_acquire(&filesys_lock);
+  opened_file = filesys_open(file);
+  lock_release(&filesys_lock);
+
+  if (opened_file == NULL)
+  {
+    return -1;
+  }
+
+  // protect next_fd_number and fd_list: use lock
+  //lock_acquire(&(cur->fd_number_lock));
+  
+  fd->fd_number = cur->next_fd_number;
+  (cur->next_fd_number)++;
+  
+  fd->opened_file = opened_file;
+
+  list_push_back(&(cur->fd_list),&(fd->elem_f));
+
+  //lock_release(&(cur->fd_number_lock));
+  
+  return fd->fd_number;
 
 }
 
 int 
 filesize (int fd)
 {
+  int file_size;
+  struct file_desc * fd_found = get_file_desc(thread_current(), fd);
+  
+  if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+  {
+    return -1;
+  }
 
+  lock_acquire(&filesys_lock);
+  file_size = file_length(fd_found->opened_file);
+  lock_release(&filesys_lock);
+  return file_size;
 }
 
 int 
