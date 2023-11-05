@@ -4,6 +4,7 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/pagedir.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -42,7 +43,7 @@ check_address (const void *addr, unsigned size)
   // case 3: unmapped
   for (i=0; i<size; i++)
   {
-    if(lookup_page(thread_current()->pagedir, addr+i, false) == NULL) //lookup_page returns null pointer if addr is unmapped
+    if(pagedir_get_page(thread_current()->pagedir, addr+i) == NULL) //lookup_page returns null pointer if addr is unmapped
     {
       exit(-1);
     }
