@@ -51,11 +51,21 @@ process_execute (const char *file_name)
   file_name_without_args = strtok_r(file_name_copy, " ", &only_args);
 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name_without_args, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (file_name_without_args, PRI_DEFAULT, start_process, fn_copy); //child is born in here
   free(file_name_copy);
 
   if (tid == TID_ERROR)
+  {
     palloc_free_page (fn_copy); 
+    return tid;
+  }
+
+  sema_down(&(thread_current()->sema_child_exec));// parent have to wait for child's signal
+  if (!(thread_current()->is_child_load_success)) // if load failed...
+  {
+    return TID_ERROR; 
+  }
+
   return tid;
 }
 
@@ -100,6 +110,10 @@ start_process (void *file_name_)
   }
   // 5. argv[0] is copied in load function, argv[1~argc-1] is copied in user stack so its safe to free memory. 
   free(file_name_for_parsing);
+
+  // 6. for exec: inform parent child's load result
+  thread_current()->parent->is_child_load_success = success;
+  sema_up(&(thread_current()->parent->sema_child_exec));
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
