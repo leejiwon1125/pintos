@@ -285,31 +285,113 @@ filesize (int fd)
 }
 
 int 
-read (int fd, void *buffer, unsigned length)
+read (int fd, void *buffer, unsigned size)
 {
+  int i;
+  int cnt_bytes_read = 0;
+  struct file_desc * fd_found;
+
+  // branch with using keyboard or not
+  if (fd == 0)
+  {
+    for (i=0; i< size; i++)
+    {
+      *((char *)buffer + i) = input_getc (); //gives one byte
+      cnt_bytes_read++;
+    }
+    return cnt_bytes_read;
+  }
+  else 
+  {
+    fd_found = get_file_desc (thread_current(), fd);
+    if (fd_found == NULL)
+    {
+      return -1;
+    }
+
+    lock_acquire(&filesys_lock);
+    cnt_bytes_read = file_read(fd_found->opened_file, buffer, size);
+    lock_release(&filesys_lock);
+    return cnt_bytes_read;
+  }
 
 }
 
 int 
-write (int fd, const void *buffer, unsigned length)
+write (int fd, const void *buffer, unsigned size)
 {
+  int i;
+  int cnt_bytes_written = 0;
+  struct file_desc * fd_found;
+
+  // branch with console output or not
+  if (fd == 1)
+  {
+    putbuf(buffer, size);
+    cnt_bytes_written = size;
+    return cnt_bytes_written;
+  }
+  else
+  {
+    fd_found = get_file_desc (thread_current(), fd);
+    if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+    {
+      return -1;
+    }
+
+    lock_acquire(&filesys_lock);
+    cnt_bytes_written = file_write(fd_found->opened_file, buffer, size);
+    lock_release(&filesys_lock);
+    return cnt_bytes_written;
+  }
 
 }
 
 void 
 seek (int fd, unsigned position)
 {
+  struct file_desc * fd_found = get_file_desc (thread_current(), fd);
+  if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+  {
+    return ;
+  }
+  
+  lock_acquire(&filesys_lock);
+  file_seek(fd_found->opened_file, position);
+  lock_release(&filesys_lock);
 
 }
 
 unsigned 
 tell (int fd)
 {
+  int position;
+  struct file_desc * fd_found = get_file_desc (thread_current(), fd);
+  if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+  {
+    return -1;
+  }
+
+  lock_acquire(&filesys_lock);
+  position = file_tell(fd_found->opened_file);
+  lock_release(&filesys_lock);
+  return position;
 
 }
 
 void 
 close (int fd)
 {
+  struct file_desc * fd_found = get_file_desc (thread_current(), fd);
+  if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+  {
+    return ;
+  }
+  lock_acquire(&filesys_lock);
+  file_close(fd_found->opened_file);  
+  lock_release(&filesys_lock);
+  // for programmer's perspective at given file.c and filesys.c etc, file_desc free is needed because its made by us.
+  list_remove(&(fd_found->elem_f));
+  free(fd_found);
 
 }
