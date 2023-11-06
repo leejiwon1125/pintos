@@ -58,7 +58,6 @@ process_execute (const char *file_name)
   if (tid == TID_ERROR)
   {
     palloc_free_page (fn_copy); 
-    return tid;
   }
 
   sema_down(&(thread_current()->sema_child_exec));// parent have to wait for child's signal
@@ -411,13 +410,13 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   /* Open executable file. */
   lock_acquire(&filesys_lock);
   file = filesys_open (file_name);
-  file_deny_write(file);
-  t->executing_file = file;
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
+  file_deny_write(file);
+  t->executing_file = file;
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
