@@ -236,7 +236,7 @@ exit (int status)
   for (e = list_begin(parent_s_child_list); e != list_end(parent_s_child_list); e = list_next(e))
   {
     cur_process = list_entry(e,struct process, elem_p);
-    if (cur_process->thread_info_p->tid == t->tid)
+    if (cur_process->tid_p == t->tid)
     {
       cur_process->exit_status_p = status;
       break;

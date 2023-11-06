@@ -111,12 +111,13 @@ start_process (void *file_name_)
   // 5. argv[0] is copied in load function, argv[1~argc-1] is copied in user stack so its safe to free memory. 
   free(file_name_for_parsing);
 
+  /* If load failed, quit. */
+  palloc_free_page (file_name);
+
   // 6. for exec: inform parent child's load result
   thread_current()->parent->is_child_load_success = success;
   sema_up(&(thread_current()->parent->sema_child_exec));
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
   if (!success) 
     thread_exit ();
 
@@ -207,14 +208,14 @@ process_wait (tid_t child_tid)
   while (e != list_end(&(cur->child_list)))
   {
     p = list_entry(e, struct process, elem_p);
-    if (p->thread_info_p->tid == child_tid)
+    if (p->tid_p == child_tid) //if child exit first then parent, p->thread_info_p might not exist anymore. let's fix struct process
     {
       child_pcb_to_wait = p;
       break;
     }
     e = list_next(e);
   }
-  //case 2
+  //case 2  printf("zxcvzxcv"); this is needed. parent child making step might be wrong
   if (child_pcb_to_wait == NULL)
   {
     return -1;
@@ -222,6 +223,11 @@ process_wait (tid_t child_tid)
 
   // record waiting_child_pid for process_exit and case 3
   cur->waiting_child_pid = child_tid;
+  if(child_pcb_to_wait->is_parent_waiting)
+  {
+    return -1;
+  }
+  child_pcb_to_wait->is_parent_waiting = true;
 
   //case 4 : exit_status in struct process is equal with its in struct thread / exit_status == INIT~ mean not yet exited
   if (child_pcb_to_wait->exit_status_p == INIT_EXIT_STATUS) // it is good to use 'while' when using semaphore, but thie case, 'if' is okay

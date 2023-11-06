@@ -131,6 +131,8 @@ struct process
   {
     struct thread * thread_info_p;
     int exit_status_p;
+    tid_t tid_p;
+    bool is_parent_waiting;
     struct list_elem elem_p;
   };
 

@@ -204,6 +204,8 @@ thread_create (const char *name, int priority,
   struct process * child_pcb = malloc(sizeof(*child_pcb));
   child_pcb->thread_info_p = t;
   child_pcb->exit_status_p = INIT_EXIT_STATUS;
+  child_pcb->tid_p = tid;
+  child_pcb->is_parent_waiting = false;
   ASSERT(child_pcb->thread_info_p->parent == thread_current());
   list_push_back(&(thread_current()->child_list), &(child_pcb->elem_p));
 
