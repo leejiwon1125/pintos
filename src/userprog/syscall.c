@@ -104,6 +104,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     {
       check_address (f->esp + 4, sizeof(char*));
 
+      check_address (*(char **)(f->esp + 4), sizeof(char*));
+
       f->eax = exec (*(const char **)(f->esp + 4));
       break;
     }
@@ -293,7 +295,7 @@ open (const char *file)
   }
 
   // protect next_fd_number and fd_list: use lock
-  lock_acquire(&(cur->fd_number_lock));
+  //lock_acquire(&(cur->fd_number_lock));
   
   fd->fd_number = cur->next_fd_number;
   (cur->next_fd_number)++;
@@ -302,7 +304,7 @@ open (const char *file)
 
   list_push_back(&(cur->fd_list),&(fd->elem_f));
 
-  lock_release(&(cur->fd_number_lock));
+  //lock_release(&(cur->fd_number_lock));
   
   return fd->fd_number;
 
