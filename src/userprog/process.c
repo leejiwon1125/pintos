@@ -255,7 +255,6 @@ process_exit (void)
   struct list_elem * e_file;
   struct file_desc * p_fd;
   // lab2 added
-
   if (cur->exit_status == INIT_EXIT_STATUS) //case 1 in process_wait
   {
     exit(-1); //inform parent to it is abnormal process_exit. its svae to call exit because main logic on thread_exit not yet occured.
@@ -266,10 +265,9 @@ process_exit (void)
   while(e_file != list_end(&(cur->fd_list)))
   {
     p_fd = list_entry(e_file, struct file_desc, elem_f);
-    close(p_fd->fd_number);
-    e_file = list_next(e_file);    
+    e_file = list_next(e_file);
+    close(p_fd->fd_number);//read-bad-ptr test wrong due to this point.
   }
-
   // free child_list's element
   while (!list_empty(&(cur->child_list)))
   {

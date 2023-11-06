@@ -5,6 +5,8 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "filesys/filesys.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -35,7 +37,7 @@ check_address (const void *addr, unsigned size)
     exit(-1);
   }
 
-  if((addr+size-1) >= PHYS_BASE || (addr+size-1) < (void*)(0x08048000) )
+  if((addr+size-1) >= PHYS_BASE || (addr) < (void*)(0x08048000) )
   {
     exit(-1);
   }
