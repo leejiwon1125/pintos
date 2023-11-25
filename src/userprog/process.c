@@ -19,6 +19,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include <stdlib.h>
+#include <spt.h>
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -410,6 +411,8 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
+
+  hash_init(&(t->sup_page_table), sup_page_table_hash_function, sup_page_table_less_func, NULL);
 
   /* Open executable file. */
   lock_acquire(&filesys_lock);
