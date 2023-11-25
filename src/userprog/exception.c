@@ -156,11 +156,19 @@ page_fault (struct intr_frame *f)
      which fault_addr refers. */
   
    ASSERT(not_present);
+
+   if( fault_addr >= PHYS_BASE || fault_addr < (void*)(0x08048000) )
+   {
+      // invalid 2: page lies within kernel VM
+      exit(-1);
+   }
+
    void * VA_for_faulted_page = (void *)((unsigned)fault_addr & 0xfffff000);
    struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(thread_current()->sup_page_table), VA_for_faulted_page);
       
    if(spt_hash_elem == NULL)
    {
+      // invalid 1: user process doesn't want this virtual address(faulted address)
       exit(-1);
    }
    else
@@ -169,6 +177,13 @@ page_fault (struct intr_frame *f)
 
       // allocate memory (== frame) for loaded page
       struct sup_page_table_entry * spt_entry = hash_entry (spt_hash_elem, struct sup_page_table_entry, spt_entry_elem);
+
+      if( (write == true) && (spt_entry->writable == false) )
+      {
+         //invalid 3: attempt to wrtie to a read-only page
+         exit(-1);
+      }
+
       void * kernel_VA_for_frame = allocate_frame(PAL_USER);
       
       // thanks to eviction, we always get frame
@@ -180,16 +195,17 @@ page_fault (struct intr_frame *f)
       ft_entry->VA_for_page = VA_for_faulted_page;
       ft_entry->thread = thread_current();
 
-      lock_acquire(&frame_table_lock);
-      list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
-      lock_release(&frame_table_lock);
-
       // do loading
       lock_acquire(&filesys_lock);
       file_seek(spt_entry->file, spt_entry->ofs);
       file_read(spt_entry->file, kernel_VA_for_frame, spt_entry->page_zero_bytes);
       lock_release(&filesys_lock);
       memset(kernel_VA_for_frame + spt_entry->page_read_bytes, 0, spt_entry->page_zero_bytes);
+
+      // going frame table after loading might be more safe
+      lock_acquire(&frame_table_lock);
+      list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
+      lock_release(&frame_table_lock);
 
       // VA_for_faulted_page should be clean becuase...
       // we reserved that page using spt (in load_segment) instead of real loading
