@@ -97,7 +97,53 @@ void * allocate_frame(enum palloc_flags flags)
 
     return kernel_VA_for_new_frame;
 }
-void free_frame(void *)
-{
 
+// this function does not clear page for page directory
+void free_frame(void * frame)
+{
+    struct list_elem * frame_table_list_ptr;
+    struct frame_table_entry * frame_table_entry_ptr;
+
+    ASSERT(pg_ofs(frame) == 0);
+
+    lock_acquire(&frame_table_lock);
+
+    frame_table_list_ptr = list_begin(&frame_table);
+    
+    while(frame_table_list_ptr != list_end(&frame_table))
+    {
+        frame_table_entry_ptr = list_entry(frame_table_list_ptr, struct frame_table_entry, frame_table_entry_elem);
+
+        if (frame_table_entry_ptr->kernel_VA_for_frame != frame)
+        {
+            frame_table_list_ptr = list_next(frame_table_list_ptr);
+        }
+        else 
+        {
+            // clock_ptr could be dangling ptr w/o this logic
+            if (frame_table_list_ptr == clock_ptr)
+            {
+                clock_ptr = list_next(clock_ptr);
+
+                if(clock_ptr == list_end(&frame_table))
+                {
+                    clock_ptr = list_begin(&frame_table);
+                }
+
+            }
+
+            list_remove(frame_table_list_ptr);
+
+            palloc_free_page(frame_table_entry_ptr->kernel_VA_for_frame);
+            free(frame_table_entry_ptr);
+
+            break;
+        }
+
+    }
+
+    // there should be frame to be freed
+    ASSERT(frame_table_list_ptr != list_end(&frame_table));
+
+    lock_release(&frame_table_lock);
 }
