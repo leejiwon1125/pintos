@@ -18,7 +18,7 @@ struct frame_table_entry
         void * VA_for_page;             // this could be either kernel VA or user VA
         struct thread * thread;         // for accessing page directory
 
-        struct list_elem frame_table_elem;
+        struct list_elem frame_table_entry_elem;
     };
 
 void frame_table_init(void);
