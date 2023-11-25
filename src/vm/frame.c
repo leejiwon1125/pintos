@@ -98,7 +98,7 @@ void * allocate_frame(enum palloc_flags flags)
     return kernel_VA_for_new_frame;
 }
 
-// this function does not clear page for page directory
+// this function does not clear page for page directory. it just consider frame table.
 void free_frame(void * frame)
 {
     struct list_elem * frame_table_list_ptr;
@@ -144,6 +144,54 @@ void free_frame(void * frame)
 
     // there should be frame to be freed
     ASSERT(frame_table_list_ptr != list_end(&frame_table));
+
+    lock_release(&frame_table_lock);
+}
+
+void free_all_frame_when_process_exit(struct thread * thread)
+{
+
+    struct list_elem * frame_table_list_ptr;
+    struct frame_table_entry * frame_table_entry_ptr;
+
+    lock_acquire(&frame_table_lock);
+
+    frame_table_list_ptr = list_begin(&frame_table);
+    
+    while(frame_table_list_ptr != list_end(&frame_table))
+    {
+        frame_table_entry_ptr = list_entry(frame_table_list_ptr, struct frame_table_entry, frame_table_entry_elem);
+
+        if (frame_table_entry_ptr->thread != thread)
+        {
+            frame_table_list_ptr = list_next(frame_table_list_ptr);
+        }
+        else 
+        {
+            // clock_ptr could be dangling ptr w/o this logic
+            if (frame_table_list_ptr == clock_ptr)
+            {
+                clock_ptr = list_next(clock_ptr);
+
+                if(clock_ptr == list_end(&frame_table))
+                {
+                    clock_ptr = list_begin(&frame_table);
+                }
+
+            }
+
+            list_remove(frame_table_list_ptr);
+
+            pagedir_clear_page(frame_table_entry_ptr->thread->pagedir, frame_table_entry_ptr->VA_for_page);
+            palloc_free_page(frame_table_entry_ptr->kernel_VA_for_frame);
+            free(frame_table_entry_ptr);
+
+        }
+
+    }
+
+    // we should check all the frame_table
+    ASSERT(frame_table_list_ptr == list_end(&frame_table));
 
     lock_release(&frame_table_lock);
 }

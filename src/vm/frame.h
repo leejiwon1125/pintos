@@ -24,6 +24,6 @@ struct frame_table_entry
 void frame_table_init(void);
 void * allocate_frame(enum palloc_flags);
 void free_frame(void *);
-
+void free_all_frame_when_process_exit(struct thread *);
 
 #endif /* vm/frame.h */
