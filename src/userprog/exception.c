@@ -4,6 +4,9 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include <spt.h>
+#include <frame.h>
+#include <process.h>
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -151,11 +154,52 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  
+   ASSERT(not_present);
+   void * VA_for_faulted_page = (void *)((unsigned)fault_addr & 0xfffff000);
+   struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(thread_current()->sup_page_table), VA_for_faulted_page);
+      
+   if(spt_hash_elem == NULL)
+   {
+      exit(-1);
+   }
+   else
+   {
+      // loading should be do in here. no more lazy
+
+      // allocate memory (== frame) for loaded page
+      struct sup_page_table_entry * spt_entry = hash_entry (spt_hash_elem, struct sup_page_table_entry, spt_entry_elem);
+      void * kernel_VA_for_frame = allocate_frame(PAL_USER);
+      
+      // thanks to eviction, we always get frame
+      ASSERT(kernel_VA_for_frame != NULL);
+
+      // obligation of caller of allocate_frame function: add page table entry
+      struct frame_table_entry * ft_entry = malloc(sizeof(*ft_entry));
+      ft_entry->kernel_VA_for_frame = kernel_VA_for_frame;
+      ft_entry->VA_for_page = VA_for_faulted_page;
+      ft_entry->thread = thread_current();
+
+      lock_acquire(&frame_table_lock);
+      list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
+      lock_release(&frame_table_lock);
+
+      // do loading
+      lock_acquire(&filesys_lock);
+      file_seek(spt_entry->file, spt_entry->ofs);
+      file_read(spt_entry->file, kernel_VA_for_frame, spt_entry->page_zero_bytes);
+      lock_release(&filesys_lock);
+      memset(kernel_VA_for_frame + spt_entry->page_read_bytes, 0, spt_entry->page_zero_bytes);
+
+      // VA_for_faulted_page should be clean becuase...
+      // we reserved that page using spt (in load_segment) instead of real loading
+      ASSERT( pagedir_get_page(&(thread_current()->pagedir), VA_for_faulted_page) == NULL );
+
+      // Add the page to the process's address space.
+      install_page(VA_for_faulted_page, kernel_VA_for_frame, spt_entry->writable);
+
+
+   }
+
 }
 

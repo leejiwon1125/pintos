@@ -592,28 +592,20 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
          and zero the final PAGE_ZERO_BYTES bytes. */
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
+      
+      struct sup_page_table_entry * spt_entry = malloc(sizeof(*spt_entry));
 
-      /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
-        return false;
+      spt_entry -> file = file;
+      spt_entry -> ofs = ofs;
+      spt_entry -> VA_for_page = upage;
+      spt_entry -> page_read_bytes = page_read_bytes;
+      spt_entry -> page_zero_bytes = page_zero_bytes;
+      spt_entry -> writable = writable;
 
-      /* Load this page. */
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      if (!install_page (upage, kpage, writable)) 
-        {
-          palloc_free_page (kpage);
-          return false; 
-        }
+      hash_insert(&(thread_current() -> sup_page_table), &(spt_entry -> spt_entry_elem));
 
       /* Advance. */
+      ofs += page_read_bytes;
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;

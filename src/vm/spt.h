@@ -12,8 +12,8 @@ struct sup_page_table_entry
     struct file * file;
     off_t ofs;
     void * VA_for_page;
-    uint32_t read_bytes;
-    uint32_t zero_bytes;
+    uint32_t page_read_bytes;
+    uint32_t page_zero_bytes;
     bool writable;
 
     struct hash_elem spt_entry_elem;
@@ -22,6 +22,6 @@ struct sup_page_table_entry
 unsigned sup_page_table_hash_function (const struct hash_elem *, void *);
 bool sup_page_table_less_func (const struct hash_elem *, const struct hash_elem *, void *);
 void sup_page_table_destruct_func (struct hash_elem *, void *);
-
+struct hash_elem * sup_page_table_find_hash_elem(struct hash *, void *);
 
 #endif /* vm/spt.h */

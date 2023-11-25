@@ -23,3 +23,11 @@ void sup_page_table_destruct_func (struct hash_elem * e, void * aux)
     hash_delete(&(thread_current() -> sup_page_table), e);
     free(spt_entry);
 }
+
+struct hash_elem * sup_page_table_find_hash_elem(struct hash * spt, void * VA_for_page)
+{
+    struct sup_page_table_entry spt_entry;
+    spt_entry.VA_for_page = VA_for_page;
+    struct hash_elem * spt_hash_elem = hash_find(spt, &(spt_entry.spt_entry_elem));
+    return spt_hash_elem;
+}
