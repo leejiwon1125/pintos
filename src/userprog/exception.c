@@ -196,13 +196,30 @@ page_fault (struct intr_frame *f)
       ft_entry->thread = thread_current();
       ft_entry->sup_page_table_entry = spt_entry;
 
-      // do loading
-      lock_acquire(&filesys_lock);
-      file_seek(spt_entry->file, spt_entry->ofs);
-      file_read(spt_entry->file, kernel_VA_for_frame, spt_entry->page_zero_bytes);
-      lock_release(&filesys_lock);
-      memset(kernel_VA_for_frame + spt_entry->page_read_bytes, 0, spt_entry->page_zero_bytes);
-
+      // pick one situation: 1. lazy load from file / 2. just get page from swap disk
+      switch(spt_entry ->current_page_location)
+      {
+         case InFile:
+         {
+            // do loading
+            lock_acquire(&filesys_lock);
+            file_seek(spt_entry->file, spt_entry->ofs);
+            file_read(spt_entry->file, kernel_VA_for_frame, spt_entry->page_zero_bytes);
+            lock_release(&filesys_lock);
+            memset(kernel_VA_for_frame + spt_entry->page_read_bytes, 0, spt_entry->page_zero_bytes);
+            break;
+         }  
+         case InSwapDisk:
+         {
+            swap_in(kernel_VA_for_frame, spt_entry ->frame_idx_in_swap_disk);
+            break;
+         }
+         case InMemory:
+         {
+            ASSERT(false);
+         }
+      }
+      
       // going frame table after loading might be more safe
       lock_acquire(&frame_table_lock);
       list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
