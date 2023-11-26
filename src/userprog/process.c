@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include <stdlib.h>
 #include <spt.h>
+#include <frame.h>
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -623,14 +624,37 @@ setup_stack (void **esp)
   uint8_t *kpage;
   bool success = false;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  // add in sup page table because this page could be evict too
+  struct sup_page_table_entry * spt_entry = malloc(sizeof(*spt_entry));
+  spt_entry ->VA_for_page = ((uint8_t *) PHYS_BASE) - PGSIZE;
+  spt_entry ->writable = true;
+  spt_entry ->go_to_swap_disk_when_evict = true;
+  spt_entry ->current_page_location = InMemory;
+
+  hash_insert(&(thread_current() -> sup_page_table), &(spt_entry -> spt_entry_elem));
+
+  
+  kpage = allocate_frame (PAL_USER | PAL_ZERO);
+
+  // caller function of allocate_frame's oblige
+  struct frame_table_entry * ft_entry = malloc(sizeof(*ft_entry));
+  ft_entry->kernel_VA_for_frame = kpage;
+  ft_entry->VA_for_page = spt_entry->VA_for_page;
+  ft_entry->thread = thread_current();
+  ft_entry->sup_page_table_entry = spt_entry;
+
+  lock_acquire(&frame_table_lock);
+  list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
+  lock_release(&frame_table_lock);
+
+  // kpage is always not NULL but respect original implementation.
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
-        palloc_free_page (kpage);
+        free_frame (kpage);
     }
   return success;
 }
