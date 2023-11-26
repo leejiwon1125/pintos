@@ -2,11 +2,12 @@
 #define VM_FRAME_H
 
 #include <list.h>
-#include <synch.h>
+#include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "threads/pagedir.h"
-#include <spt.h>
+#include "vm/spt.h"
+#include "vm/swap.h"
 
 struct list frame_table;
 struct lock frame_table_lock;

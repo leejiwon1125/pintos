@@ -25,6 +25,7 @@ struct sup_page_table_entry
     // for evcition situation
     bool go_to_swap_disk_when_evict;
     enum current_location_for_page current_page_location;
+    size_t frame_idx_in_swap_disk;
 
     struct hash_elem spt_entry_elem;
   };

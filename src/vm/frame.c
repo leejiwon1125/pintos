@@ -70,7 +70,7 @@ void * allocate_frame(enum palloc_flags flags)
         if ( fte_for_victim_frame->sup_page_table_entry-> go_to_swap_disk_when_evict )
         {
             // goto swap disk
-            // TODO : implement swap out logic
+            fte_for_victim_frame ->sup_page_table_entry ->frame_idx_in_swap_disk = swap_out(fte_for_victim_frame ->kernel_VA_for_frame);
             fte_for_victim_frame ->sup_page_table_entry ->current_page_location = InSwapDisk;
         }
         else
