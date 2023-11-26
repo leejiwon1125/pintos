@@ -64,7 +64,34 @@ void * allocate_frame(enum palloc_flags flags)
         ASSERT(fte_for_victim_frame != NULL);
 
         // step B. have to do remedy for victim frame 
-        // TODO : implement write back logic
+        
+        ASSERT( fte_for_victim_frame ->sup_page_table_entry -> current_page_location == InMemory);
+
+        if ( fte_for_victim_frame->sup_page_table_entry-> go_to_swap_disk_when_evict )
+        {
+            // goto swap disk
+            // TODO : implement swap out logic
+            fte_for_victim_frame ->sup_page_table_entry ->current_page_location = InSwapDisk;
+        }
+        else
+        {
+            // goto file
+            ASSERT( fte_for_victim_frame ->VA_for_page == fte_for_victim_frame ->sup_page_table_entry ->VA_for_page);
+            if(pagedir_is_dirty(fte_for_victim_frame ->thread ->pagedir, fte_for_victim_frame->VA_for_page))
+            {
+                lock_acquire(&filesys_lock);
+                file_write_at(
+                                fte_for_victim_frame ->sup_page_table_entry ->file, 
+                                fte_for_victim_frame ->kernel_VA_for_frame,
+                                fte_for_victim_frame ->sup_page_table_entry ->page_read_bytes,
+                                fte_for_victim_frame ->sup_page_table_entry ->ofs
+                            )
+                lock_release(&filesys_lock);
+            }
+            // update spt. note that evicting page does "not" mean that freeing its spt entry but update it. 
+            // we have to take care of all the 'page' that process uses.
+            fte_for_victim_frame ->sup_page_table_entry ->current_page_location = InFile;
+        }
 
         // step C. free vicitim frame
         

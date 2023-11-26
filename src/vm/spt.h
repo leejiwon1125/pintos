@@ -5,6 +5,12 @@
 #include <file.h>
 #include <thread.h>
 
+enum current_location_for_page 
+  {
+    InMemory,
+    InFile,
+    InSwapDisk
+  };
 
 struct sup_page_table_entry
   {
@@ -15,6 +21,10 @@ struct sup_page_table_entry
     uint32_t page_read_bytes;
     uint32_t page_zero_bytes;
     bool writable;
+
+    // for evcition situation
+    bool go_to_swap_disk_when_evict;
+    enum current_location_for_page current_page_location;
 
     struct hash_elem spt_entry_elem;
   };

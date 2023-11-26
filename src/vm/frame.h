@@ -6,6 +6,7 @@
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "threads/pagedir.h"
+#include <spt.h>
 
 struct list frame_table;
 struct lock frame_table_lock;
@@ -17,6 +18,7 @@ struct frame_table_entry
         void * kernel_VA_for_frame;
         void * VA_for_page;             // this could be either kernel VA or user VA
         struct thread * thread;         // for accessing page directory
+        struct sup_page_table_entry * sup_page_table_entry;
 
         struct list_elem frame_table_entry_elem;
     };

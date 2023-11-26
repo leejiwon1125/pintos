@@ -194,6 +194,7 @@ page_fault (struct intr_frame *f)
       ft_entry->kernel_VA_for_frame = kernel_VA_for_frame;
       ft_entry->VA_for_page = VA_for_faulted_page;
       ft_entry->thread = thread_current();
+      ft_entry->sup_page_table_entry = spt_entry;
 
       // do loading
       lock_acquire(&filesys_lock);
