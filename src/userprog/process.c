@@ -601,7 +601,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       spt_entry -> page_read_bytes = page_read_bytes;
       spt_entry -> page_zero_bytes = page_zero_bytes;
       spt_entry -> writable = writable;
-      spt_entry -> go_to_swap_disk_when_evict = false;
+      spt_entry -> go_to_swap_disk_when_evict = true;
       spt_entry -> current_page_location = InFile;
 
       hash_insert(&(thread_current() -> sup_page_table), &(spt_entry -> spt_entry_elem));

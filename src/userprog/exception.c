@@ -220,6 +220,8 @@ page_fault (struct intr_frame *f)
          }
       }
       
+      spt_entry ->current_page_location = InMemory;
+
       // going frame table after loading might be more safe
       lock_acquire(&frame_table_lock);
       list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
