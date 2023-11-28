@@ -74,6 +74,80 @@ decide_stack_growth_and_do_if_needed (void * esp, void * addr)
 }
 
 static void 
+allocate_frame_for_syscall_if_needed (void * user_VA_for_page)
+{
+
+  struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(thread_current()->sup_page_table), user_VA_for_page);
+  ASSERT(spt_hash_elem != NULL);
+
+  bool is_mapped = (pagedir_get_page(&(thread_current()->pagedir), user_VA_for_page) != NULL);
+  if (is_mapped)
+  {
+    // case 1: mapping was already created. So syscall can work.
+    return ;
+  }
+  else 
+  {
+    // case 2: not yet mapped. Try allocating for syscall 
+    struct sup_page_table_entry * spt_entry = hash_entry(spt_hash_elem, struct sup_page_table_entry, spt_entry_elem); 
+
+    void * kernel_VA_for_frame = allocate_frame(PAL_USER);
+      
+    // thanks to eviction, we always get frame
+    ASSERT(kernel_VA_for_frame != NULL);
+
+    // obligation of caller of allocate_frame function: add page table entry
+    struct frame_table_entry * ft_entry = malloc(sizeof(*ft_entry));
+    ft_entry->kernel_VA_for_frame = kernel_VA_for_frame;
+    ft_entry->VA_for_page = user_VA_for_page;
+    ft_entry->thread = thread_current();
+    ft_entry->sup_page_table_entry = spt_entry;
+
+    // pick one situation: 1. lazy load from file / 2. just get page from swap disk
+    switch(spt_entry ->current_page_location)
+    {
+        case InFile:
+        {
+          // do loading
+          lock_acquire(&filesys_lock);
+          file_seek(spt_entry->file, spt_entry->ofs);
+          file_read(spt_entry->file, kernel_VA_for_frame, spt_entry->page_zero_bytes);
+          lock_release(&filesys_lock);
+          memset(kernel_VA_for_frame + spt_entry->page_read_bytes, 0, spt_entry->page_zero_bytes);
+          break;
+        }  
+        case InSwapDisk:
+        {
+          swap_in(kernel_VA_for_frame, spt_entry ->frame_idx_in_swap_disk);
+          break;
+        }
+        case InMemory:
+        {
+          ASSERT(false);
+        }
+    }
+
+    spt_entry ->current_page_location = InMemory;
+
+    // going frame table after loading might be more safe
+    lock_acquire(&frame_table_lock);
+    list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
+    lock_release(&frame_table_lock);
+
+    // VA_for_faulted_page should be clean becuase...
+    // we reserved that page using spt (in load_segment) instead of real loading
+    ASSERT( pagedir_get_page(&(thread_current()->pagedir), user_VA_for_page) == NULL );
+
+    // Add the page to the process's address space.
+    install_page(user_VA_for_page, kernel_VA_for_frame, spt_entry->writable);
+
+    return ;
+  }
+
+  
+}
+
+static void 
 check_address (const void *addr, unsigned size, const void * esp)
 {
   int i;
@@ -111,24 +185,27 @@ check_address (const void *addr, unsigned size, const void * esp)
 
     if (spt_hash_elem == NULL)
     {
-      // case 1 : if unmapped -> check if stack growth is needed
-      if(!decide_stack_growth_and_do_if_needed(esp, addr + i))
+      // case 1 : if totally unmapped -> check if stack growth is needed
+      bool is_stack_growing_case = decide_stack_growth_and_do_if_needed(esp, addr + i);
+      if(!is_stack_growing_case)
       {
         exit(-1);
       }
+      // could be break; return;
     }
     else 
     {
-      // case 2 : if mapped -> it might be 'not' in frame but in page.
+      // case 2 : if hope for creating mapping exist, but 'may' not yet mapped  -> it might be 'not' in frame but in spt.
       // for system call, make it in physical memory to work properly.
       // TODO: function like page fault ... 
       //       related VA's information is definitly in spt.
+      allocate_frame_for_syscall_if_needed (user_VA_for_page);
+      // could be break; return;
+      // page fault during syscall could cover this case...?
 
     }
 
   }
-
-
     
 }
 
