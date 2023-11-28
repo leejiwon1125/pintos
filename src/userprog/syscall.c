@@ -7,6 +7,9 @@
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
 #include "userprog/process.h"
+#include <spt.h>
+#include <frame.h>
+#include <process.h>
 
 static void syscall_handler (struct intr_frame *);
 
@@ -17,8 +20,61 @@ syscall_init (void)
   lock_init(&filesys_lock);
 }
 
+bool 
+decide_stack_growth_and_do_if_needed (void * esp, void * addr)
+{
+  // at least this condition should be fulfilled to be candidate of stack growth access
+  if (!( (addr == esp -4)||(addr == esp -32) ))
+  {
+    return false;
+  }
+
+  ASSERT( !(unsigned int)PHYS_BASE - (unsigned int)esp > (1<<23) )
+  
+  void * user_VA_for_page = (void *)((unsigned int)addr & 0xfffff000);
+
+  if ((unsigned int)PHYS_BASE - (unsigned int)user_VA_for_page > (1<<23))
+  {
+    return false;
+  }
+
+  // add in sup page table because this page could be evict too
+  struct sup_page_table_entry * spt_entry = malloc(sizeof(*spt_entry));
+  spt_entry ->VA_for_page = user_VA_for_page;
+  spt_entry ->writable = true;
+  spt_entry ->go_to_swap_disk_when_evict = true;
+  spt_entry ->current_page_location = InMemory;
+  
+  void * kernel_VA_for_new_frame = allocate_frame (PAL_USER | PAL_ZERO);
+
+  // caller function of allocate_frame's oblige
+  struct frame_table_entry * ft_entry = malloc(sizeof(*ft_entry));
+  ft_entry->kernel_VA_for_frame = kernel_VA_for_new_frame;
+  ft_entry->VA_for_page = spt_entry->VA_for_page;
+  ft_entry->thread = thread_current();
+  ft_entry->sup_page_table_entry = spt_entry;
+
+  lock_acquire(&frame_table_lock);
+  list_push_back(&frame_table, &(ft_entry->frame_table_entry_elem));
+  lock_release(&frame_table_lock);
+
+  bool success = install_page (user_VA_for_page, kernel_VA_for_new_frame, true);
+  if (success)
+  {
+    // this function just decide whether stack growth is needed. -> does not change esp
+    hash_insert(&(thread_current() -> sup_page_table), &(spt_entry -> spt_entry_elem));
+    return true;
+  }
+  else
+  {
+    free(spt_entry);
+    free_frame (kernel_VA_for_new_frame);
+    return false;
+  }
+}
+
 static void 
-check_address (const void *addr, unsigned size)
+check_address (const void *addr, unsigned size, const void * esp)
 {
   int i;
 
@@ -45,11 +101,34 @@ check_address (const void *addr, unsigned size)
   // case 3: unmapped
   for (i=0; i<size; i++)
   {
-    if(pagedir_get_page(thread_current()->pagedir, addr+i) == NULL) //lookup_page returns null pointer if addr is unmapped
+    // this is not the case in lab3
+    //if(pagedir_get_page(thread_current()->pagedir, addr+i) == NULL) //lookup_page returns null pointer if addr is unmapped
+    //{
+    //  exit(-1);
+    //}
+    void * user_VA_for_page = (void *)((unsigned)(addr + i) & 0xfffff000);
+    struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(thread_current()->sup_page_table), user_VA_for_page);
+
+    if (spt_hash_elem == NULL)
     {
-      exit(-1);
+      // case 1 : if unmapped -> check if stack growth is needed
+      if(!decide_stack_growth_and_do_if_needed(esp, addr + i))
+      {
+        exit(-1);
+      }
     }
+    else 
+    {
+      // case 2 : if mapped -> it might be 'not' in frame but in page.
+      // for system call, make it in physical memory to work properly.
+      // TODO: function like page fault ... 
+      //       related VA's information is definitly in spt.
+
+    }
+
   }
+
+
     
 }
 
@@ -86,7 +165,7 @@ get_file_desc(struct thread * t, int fd_number)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  check_address (f->esp, 4);
+  check_address (f->esp, 4, f->esp);
   
   switch (*(uint32_t *) (f->esp)) // syscall number
   {
@@ -97,36 +176,36 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_EXIT:
     {
-      check_address (f->esp + 4, sizeof(int));
+      check_address (f->esp + 4, sizeof(int), f->esp);
 
       exit (*(int *)(f->esp + 4));
       break;
     }
     case SYS_EXEC:
     {
-      check_address (f->esp + 4, sizeof(char*));
+      check_address (f->esp + 4, sizeof(char*), f->esp);
 
-      check_address (*(char **)(f->esp + 4), sizeof(char*));
+      check_address (*(char **)(f->esp + 4), sizeof(char*), f->esp);
 
       f->eax = exec (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_WAIT:
     {
-      check_address (f->esp + 4, sizeof(int));
+      check_address (f->esp + 4, sizeof(int), f->esp);
 
       f->eax = wait (*(int *)(f->esp + 4)); //pid_t == int
       break;
     }
     case SYS_CREATE:
     {
-      check_address (f->esp + 4, sizeof(char*));
-      check_address (f->esp + 8, sizeof(unsigned));
+      check_address (f->esp + 4, sizeof(char*), f->esp);
+      check_address (f->esp + 8, sizeof(unsigned), f->esp);
 
       // f->esp+4 == address of 'char * file' in "stack". 
       // we have to check_address not just stack's address
       // but also char * file 's pointing address.
-      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
+      check_address (*(char **)(f->esp + 4), sizeof(char*), f->esp); 
 
       f->eax = create (
           *(const char **)(f->esp + 4),
@@ -136,36 +215,36 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_REMOVE:
     {
-      check_address (f->esp + 4, sizeof(char*));
+      check_address (f->esp + 4, sizeof(char*), f->esp);
 
-      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
+      check_address (*(char **)(f->esp + 4), sizeof(char*), f->esp); 
 
       f->eax = remove (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_OPEN:
     {
-      check_address (f->esp + 4, sizeof(char*));
+      check_address (f->esp + 4, sizeof(char*), f->esp);
 
-      check_address (*(char **)(f->esp + 4), sizeof(char*)); 
+      check_address (*(char **)(f->esp + 4), sizeof(char*), f->esp); 
 
       f->eax = open (*(const char **)(f->esp + 4));
       break;
     }
     case SYS_FILESIZE:
     {
-      check_address (f->esp + 4,sizeof(int));
+      check_address (f->esp + 4,sizeof(int), f->esp);
 
       f->eax = filesize (*(int *)(f->esp + 4));
       break;
     }
     case SYS_READ:
     {
-      check_address (f->esp + 4,sizeof(int));
-      check_address (f->esp + 8,sizeof(void*));
-      check_address (f->esp + 12,sizeof(unsigned));
+      check_address (f->esp + 4,sizeof(int), f->esp);
+      check_address (f->esp + 8,sizeof(void*), f->esp);
+      check_address (f->esp + 12,sizeof(unsigned), f->esp);
 
-      check_address (*(void **)(f->esp + 8), sizeof(void*)); 
+      check_address (*(void **)(f->esp + 8), sizeof(void*), f->esp); 
 
       f->eax = read (
           *(int *)(f->esp + 4),
@@ -176,11 +255,11 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_WRITE:
     {
-      check_address (f->esp + 4,sizeof(int));
-      check_address (f->esp + 8,sizeof(void*));
-      check_address (f->esp + 12,sizeof(unsigned));
+      check_address (f->esp + 4,sizeof(int), f->esp);
+      check_address (f->esp + 8,sizeof(void*), f->esp);
+      check_address (f->esp + 12,sizeof(unsigned), f->esp);
 
-      check_address (*(void **)(f->esp + 8), sizeof(void*)); 
+      check_address (*(void **)(f->esp + 8), sizeof(void*), f->esp); 
 
       f->eax = write (
           *(int *)(f->esp + 4),
@@ -191,8 +270,8 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_SEEK:
     {
-      check_address (f->esp + 4, sizeof(int));
-      check_address (f->esp + 8, sizeof(unsigned));
+      check_address (f->esp + 4, sizeof(int), f->esp);
+      check_address (f->esp + 8, sizeof(unsigned), f->esp);
 
       seek (
           *(int *)(f->esp + 4),
@@ -202,14 +281,14 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_TELL:
     {
-      check_address (f->esp + 4,sizeof(int));
+      check_address (f->esp + 4,sizeof(int), f->esp);
 
       f->eax = tell (*(int *)(f->esp + 4));
       break;
     }
     case SYS_CLOSE:
     {
-      check_address (f->esp + 4,sizeof(int));
+      check_address (f->esp + 4,sizeof(int), f->esp);
 
       close (*(int *)(f->esp +  4));
       break;

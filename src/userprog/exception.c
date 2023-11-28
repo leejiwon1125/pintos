@@ -7,6 +7,7 @@
 #include <spt.h>
 #include <frame.h>
 #include <process.h>
+#include <syscall.h>
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -169,7 +170,21 @@ page_fault (struct intr_frame *f)
    if(spt_hash_elem == NULL)
    {
       // invalid 1: user process doesn't want this virtual address(faulted address)
-      exit(-1);
+      // this could be the place where stack growth is needed.
+      if(user)
+      {
+         bool is_stack_growing_case = decide_stack_growth_and_do_if_needed(f->esp, fault_addr);
+         if (!is_stack_growing_case)
+         {
+            exit(-1);
+         }
+      }
+      else
+      {
+         // grow only user stack
+         exit(-1);
+      }
+
    }
    else
    {

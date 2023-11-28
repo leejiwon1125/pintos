@@ -6,7 +6,7 @@ void syscall_init (void);
 #endif /* userprog/syscall.h */
 
 //typedef int pid_t;
-
+bool decide_stack_growth_and_do_if_needed (void * esp, void * addr)
 void halt (void);
 void exit (int status);
 int exec (const char *file);
