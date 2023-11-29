@@ -40,7 +40,7 @@ void * allocate_frame(enum palloc_flags flags)
             victim_frame_ptr = list_entry (clock_ptr, struct frame_table_entry, frame_table_entry_elem);
             
             // use clock algorithm
-            is_accessed = pagedir_is_accessed(victim_frame_ptr->thread->pagedir, victim_frame_ptr->VA_for_page)
+            is_accessed = pagedir_is_accessed(victim_frame_ptr->thread->pagedir, victim_frame_ptr->VA_for_page);
             if (is_accessed)
             {
                 pagedir_set_accessed(victim_frame_ptr->thread->pagedir, victim_frame_ptr->VA_for_page, false);
@@ -85,7 +85,7 @@ void * allocate_frame(enum palloc_flags flags)
                                 fte_for_victim_frame ->kernel_VA_for_frame,
                                 fte_for_victim_frame ->sup_page_table_entry ->page_read_bytes,
                                 fte_for_victim_frame ->sup_page_table_entry ->ofs
-                            )
+                            );
                 lock_release(&filesys_lock);
             }
             // update spt. note that evicting page does "not" mean that freeing its spt entry but update it. 
@@ -98,7 +98,7 @@ void * allocate_frame(enum palloc_flags flags)
         //   step1. remove fte from frame table
         clock_ptr_next = list_next(clock_ptr);
         
-        ASSERT(fte_for_victim_frame->frame_table_entry_elem == clock_ptr);
+        ASSERT(&(fte_for_victim_frame->frame_table_entry_elem) == clock_ptr);
         list_remove(clock_ptr);
         
         clock_ptr = clock_ptr_next;
@@ -112,7 +112,7 @@ void * allocate_frame(enum palloc_flags flags)
 
         //   step3. free resources: frame and memory for fte
         palloc_free_page(fte_for_victim_frame->kernel_VA_for_frame);
-        free(fte_for_victim_frame)
+        free(fte_for_victim_frame);
         
 
         // try again for allocate
