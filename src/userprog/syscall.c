@@ -596,3 +596,15 @@ close (int fd)
   free(fd_found);
 
 }
+
+mapid_t 
+mmap (int fd, void *addr)
+{
+
+}
+
+void 
+munmap (mapid_t mapping)
+{
+
+}

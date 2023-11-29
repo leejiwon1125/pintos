@@ -490,6 +490,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->next_fd_number = 2;
   lock_init(&(t->fd_number_lock));
 
+  list_init(&(t->mmapped_file_list));
+  
   t->executing_file = NULL;
 
   old_level = intr_disable ();

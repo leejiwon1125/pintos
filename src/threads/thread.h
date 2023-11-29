@@ -126,6 +126,8 @@ struct thread
 
     struct hash sup_page_table;
 
+    struct list mmapped_file_list;
+
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
@@ -144,6 +146,16 @@ struct file_desc
     int fd_number;
     struct file *opened_file;
     struct list_elem elem_f;
+  };
+
+struct mmap_file
+  {
+    mapid_t mapping_id;
+    void * VA_for_mmapped;
+    int number_of_pages_using;
+
+    struct list_elem elem_m;
+
   };
 
 /* If false (default), use round-robin scheduler.
