@@ -53,3 +53,12 @@ size_t swap_out(void * kernel_VA_for_frame)
     return frame_idx_in_swap_disk;
 
 }
+
+void 
+swap_disk_free (size_t bit_idx)
+{
+    ASSERT(bitmap_scan(swap_disk_bitmap,bit_idx,1,true) == bit_idx);
+    lock_acquire(&swap_disk_bitmap_lock);
+    bitmap_flip (swap_disk_bitmap, bit_idx);
+    lock_release(&swap_disk_bitmap_lock);
+}

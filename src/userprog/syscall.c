@@ -774,3 +774,16 @@ munmap (mapid_t mapping)
   lock_release(&filesys_lock);
 
 }
+
+void munmap_when_process_exit (struct thread * thread)
+{
+  struct list_elem * mmap_file_list_ptr = list_begin(&(thread ->mmapped_file_list));
+
+  while (mmap_file_list_ptr != list_end(&(thread ->mmapped_file_list)))
+  {
+    struct mmap_file * mmap_file = list_entry (mmap_file_list_ptr, struct mmap_file, elem_m);
+    mmap_file_list_ptr = list_next(mmap_file_list_ptr);
+    mnumap(mmap_file->mapping_id);
+  }
+
+}

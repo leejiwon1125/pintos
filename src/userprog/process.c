@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <spt.h>
 #include <frame.h>
+#include <hash.h>
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -283,6 +284,14 @@ process_exit (void)
     file_allow_write(cur->executing_file);
     file_close(cur->executing_file);
   }
+
+  // lab 3 related resource free
+  // 1. mmap
+  munmap_when_process_exit(cur);
+  // 2. frame table
+  free_all_frame_when_process_exit(cur);
+  // 3. sup page table
+  hash_destroy(&(cur->sup_page_table), sup_page_table_destruct_func);
 
   // if parent is waiting for 'cur' thread to exit, signal to parent
   if (cur->parent->waiting_child_pid == cur->tid)

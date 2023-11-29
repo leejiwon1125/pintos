@@ -21,6 +21,10 @@ void sup_page_table_destruct_func (struct hash_elem * e, void * aux)
     // buckets: array / buckets' element: struct list / buckets' element's element: struct sup_page_table_entry
     struct sup_page_table_entry * spt_entry = hash_entry (e, struct sup_page_table_entry, spt_entry_elem);
     hash_delete(&(thread_current() -> sup_page_table), e);
+    if ( spt_entry ->current_page_location == InSwapDisk)
+    {
+        swap_disk_free (spt_entry->frame_idx_in_swap_disk);
+    }
     free(spt_entry);
 }
 
