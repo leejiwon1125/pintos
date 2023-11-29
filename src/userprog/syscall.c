@@ -10,6 +10,7 @@
 #include <spt.h>
 #include <frame.h>
 #include <process.h>
+#include <spt.h>
 
 static void syscall_handler (struct intr_frame *);
 
@@ -600,11 +601,176 @@ close (int fd)
 mapid_t 
 mmap (int fd, void *addr)
 {
+  // step 1. basic inspect
+
+  if (pg_ofs(addr) !=0 || addr == 0 || fd == 0 || fd == 1)
+  {
+    // case 2: not page-aligned
+    // case 4: address 0
+    // case 5: fd 0, 1
+    return -1;
+  }
+
+  struct thread * t = thread_current ();
+  struct file * file;
+  off_t bytes_to_read;
+  struct file_desc * fd_found = get_file_desc (t, fd); 
+
+  if (fd_found == NULL) //No such fd in thread_current for debugging purpose
+  {
+    return -1;
+  }
+
+  lock_acquire(&filesys_lock);
+  file = file_reopen();
+  bytes_to_read = file_length(file)
+
+  if ( bytes_to_read == 0 )
+  {
+    // case 1: zero bytes
+    file_close(file);
+    lock_release(&filesys_lock);
+    return -1;
+  }
+
+  lock_release(&filesys_lock);
+
+  // step 2. add info into sup page table for lazy loading
+
+ 
+  off_t ofs = 0;
+  void * upage = addr;
+  int number_of_pages_used = 0;
+
+  int i = 0;
+
+  while (bytes_to_read >0)
+  {
+    struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(t->sup_page_table), upage);
+
+    if (spt_hash_elem != NULL || (addr >= PHYS_BASE || addr < (void*)(0x08048000) ))
+    {
+      // case 3: overlaps with any existing set of mapped pages.
+      // case +: it should be only in user VA because mmapp is per process
+
+      for (i = 0; i < number_of_pages_used, i++)
+      {
+        void * VA_to_remove = addr + PGSIZE * i;
+        struct hash_elem * spt_hash_elem_to_remove = sup_page_table_find_hash_elem(&(t->sup_page_table), VA_to_remove);
+        sup_page_table_destruct_func (spt_hash_elem_to_remove, NULL);
+      }
+
+      lock_acquire(&filesys_lock);
+      file_close(file);
+      lock_release(&filesys_lock);
+
+      return -1;
+    }
+
+    // calculate how to fill this page
+    size_t page_read_bytes = bytes_to_read < PGSIZE ? bytes_to_read : PGSIZE;
+    size_t page_zero_bytes = PGSIZE - page_read_bytes;
+
+    // for lazy loading
+    struct sup_page_table_entry * spt_entry = malloc(sizeof(*spt_entry));
+
+    spt_entry -> file = file;
+    spt_entry -> ofs = ofs;
+    spt_entry -> VA_for_page = upage;
+    spt_entry -> page_read_bytes = page_read_bytes;
+    spt_entry -> page_zero_bytes = page_zero_bytes;
+    spt_entry -> writable = true;
+    spt_entry -> go_to_swap_disk_when_evict = false;
+    spt_entry -> current_page_location = InFile;
+
+    hash_insert(&(t -> sup_page_table), &(spt_entry -> spt_entry_elem));
+
+    // for iteration
+    ofs += page_read_bytes;
+    bytes_to_read -= page_read_bytes;
+    upage += PGSIZE;
+
+    number_of_pages_used ++;
+  }
+
+  ASSERT(bytes_to_read == 0);
+
+  // step 3. add info into mmaped_file_list
+  struct mmap_file * mmap_file = malloc(sizeof(*mmap_file));
+  mmap_file ->mapping_id = t->next_mmapped_file_number;
+  (t->next_mmapped_file_number)++;
+  mmap_file ->VA_for_mmapped = addr;
+  mmap_file ->number_of_pages_using = number_of_pages_used;
+  
+  // no need lock becuase this is system call
+  list_push_back(&(t->mmapped_file_list), &(mmap_file->elem_m));
+  return mmap_file ->mapping_id;
 
 }
 
 void 
 munmap (mapid_t mapping)
 {
+  struct thraed * t = thread_current ();
+
+  // step 1. find mmap file
+  struct list_elem * mmap_file_list_ptr = list_begin(&(t->mmapped_file_list));
+  struct mmap_file * mmap_file;
+
+  while (mmap_file_list_ptr != list_end(&(t->mmapped_file_list)))
+  {
+    mmap_file = list_entry (mmap_file_list_ptr, struct mmap_file, elem_m);
+    if(mmap_file->mapping_id == mapping)
+    {
+      break;
+    }
+    mmap_file_list_ptr = list_next(mmap_file_list_ptr);
+  }
+
+  if(mmap_file_list_ptr == list_end(&(t->mmapped_file_list)))
+  {
+    // no such mmapped file
+    exit(-1);
+  }
+
+  int i;
+
+  lock_acquire(&filesys_lock);
+
+  for (i = 0; i < mmap_file->number_of_pages_using; i++)
+  {
+    void * VA_to_remove = mmap_file->VA_for_mmapped + PGSIZE * i;
+    struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(t->sup_page_table), VA_to_remove);
+    struct sup_page_table_entry * spt_entry = hash_entry (spt_hash_elem, struct sup_page_table_entry, spt_entry_elem);
+
+    ASSERT(spt_entry->VA_for_page == VA_to_remove);
+
+    void * kernel_VA_for_removing_file = pagedir_get_page (t->pagedir, VA_to_remove);
+    
+    if (pagedir_is_dirty(t->pagedir, VA_to_remove))
+    {
+      
+      file_write_at(
+                      spt_entry->file, 
+                      kernel_VA_for_removing_file, 
+                      spt_entry ->page_read_bytes, 
+                      spt_entry ->ofs
+                    );
+      
+    }
+    pagedir_clear_page(t->pagedir, VA_to_remove);
+
+    // free all releated resources 
+    free(spt_entry);
+    free_frame(kernel_VA_for_removing_file);
+    sup_page_table_destruct_func(spt_hash_elem, NULL);
+  }
+
+  // free all releated resources 
+  list_remove(&(mmap_file->elem_m));
+  free(mmap_file);
+
+  file_close(file);
+  lock_release(&filesys_lock);
 
 }

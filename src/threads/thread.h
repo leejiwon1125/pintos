@@ -19,6 +19,7 @@ enum thread_status
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
+typedef int mapid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
@@ -127,6 +128,7 @@ struct thread
     struct hash sup_page_table;
 
     struct list mmapped_file_list;
+    int next_mmapped_file_number;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
