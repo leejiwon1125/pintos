@@ -491,7 +491,7 @@ init_thread (struct thread *t, const char *name, int priority)
   lock_init(&(t->fd_number_lock));
 
   list_init(&(t->mmapped_file_list));
-  next_mmapped_file_number = 0;
+  t->next_mmapped_file_number = 0;
 
   t->executing_file = NULL;
 

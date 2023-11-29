@@ -7,10 +7,11 @@
 #include "userprog/pagedir.h"
 #include "filesys/filesys.h"
 #include "userprog/process.h"
-#include <spt.h>
-#include <frame.h>
-#include <process.h>
-#include <spt.h>
+#include "vm/frame.h"
+#include "userprog/process.h"
+#include "vm/spt.h"
+#include "vm/swap.h"
+#include "threads/malloc.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -622,8 +623,8 @@ mmap (int fd, void *addr)
   }
 
   lock_acquire(&filesys_lock);
-  file = file_reopen();
-  bytes_to_read = file_length(file)
+  file = file_reopen(fd_found->opened_file);
+  bytes_to_read = file_length(file);
 
   if ( bytes_to_read == 0 )
   {
@@ -653,7 +654,7 @@ mmap (int fd, void *addr)
       // case 3: overlaps with any existing set of mapped pages.
       // case +: it should be only in user VA because mmapp is per process
 
-      for (i = 0; i < number_of_pages_used, i++)
+      for (i = 0; i < number_of_pages_used; i++)
       {
         void * VA_to_remove = addr + PGSIZE * i;
         struct hash_elem * spt_hash_elem_to_remove = sup_page_table_find_hash_elem(&(t->sup_page_table), VA_to_remove);
@@ -711,7 +712,7 @@ mmap (int fd, void *addr)
 void 
 munmap (mapid_t mapping)
 {
-  struct thraed * t = thread_current ();
+  struct thread * t = thread_current ();
 
   // step 1. find mmap file
   struct list_elem * mmap_file_list_ptr = list_begin(&(t->mmapped_file_list));
@@ -734,7 +735,7 @@ munmap (mapid_t mapping)
   }
 
   int i;
-
+  struct file * file;
   lock_acquire(&filesys_lock);
 
   for (i = 0; i < mmap_file->number_of_pages_using; i++)
@@ -742,6 +743,8 @@ munmap (mapid_t mapping)
     void * VA_to_remove = mmap_file->VA_for_mmapped + PGSIZE * i;
     struct hash_elem * spt_hash_elem = sup_page_table_find_hash_elem(&(t->sup_page_table), VA_to_remove);
     struct sup_page_table_entry * spt_entry = hash_entry (spt_hash_elem, struct sup_page_table_entry, spt_entry_elem);
+    
+    file = spt_entry -> file;
 
     ASSERT(spt_entry->VA_for_page == VA_to_remove);
 
@@ -783,7 +786,7 @@ void munmap_when_process_exit (struct thread * thread)
   {
     struct mmap_file * mmap_file = list_entry (mmap_file_list_ptr, struct mmap_file, elem_m);
     mmap_file_list_ptr = list_next(mmap_file_list_ptr);
-    mnumap(mmap_file->mapping_id);
+    munmap(mmap_file->mapping_id);
   }
 
 }

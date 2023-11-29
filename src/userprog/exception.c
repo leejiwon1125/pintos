@@ -4,10 +4,11 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-#include <spt.h>
-#include <frame.h>
-#include <process.h>
-#include <syscall.h>
+#include "vm/spt.h"
+#include "vm/frame.h"
+#include "userprog/process.h"
+#include "userprog/syscall.h"
+#include "threads/malloc.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;

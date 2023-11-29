@@ -1,4 +1,4 @@
-#include <spt.h>
+#include "vm/spt.h"
 
 unsigned sup_page_table_hash_function (const struct hash_elem * e, void * aux)
 {

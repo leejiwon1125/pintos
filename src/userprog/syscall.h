@@ -3,10 +3,11 @@
 
 void syscall_init (void);
 #include <stdbool.h>
+#include "threads/thread.h"
 #endif /* userprog/syscall.h */
 
 //typedef int pid_t;
-bool decide_stack_growth_and_do_if_needed (void * esp, void * addr)
+bool decide_stack_growth_and_do_if_needed (void * esp, void * addr);
 void halt (void);
 void exit (int status);
 int exec (const char *file);
@@ -23,3 +24,5 @@ void close (int fd);
 
 mapid_t mmap (int fd, void *addr);
 void munmap (mapid_t);
+
+void munmap_when_process_exit (struct thread * thread);

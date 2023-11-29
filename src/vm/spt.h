@@ -2,8 +2,8 @@
 #define VM_SPT_H
 
 #include <hash.h>
-#include <file.h>
-#include <thread.h>
+#include "filesys/file.h"
+#include "threads/thread.h"
 
 enum current_location_for_page 
   {

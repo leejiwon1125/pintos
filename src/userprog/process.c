@@ -19,9 +19,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include <stdlib.h>
-#include <spt.h>
-#include <frame.h>
+#include "vm/spt.h"
+#include "vm/frame.h"
 #include <hash.h>
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);

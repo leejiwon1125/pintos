@@ -5,7 +5,7 @@
 #include "threads/synch.h"
 #include "threads/thread.h"
 #include "threads/palloc.h"
-#include "threads/pagedir.h"
+#include "userprog/pagedir.h"
 #include "vm/spt.h"
 #include "vm/swap.h"
 

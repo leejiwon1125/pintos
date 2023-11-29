@@ -1,4 +1,4 @@
-#include <swap.h>
+#include "vm/swap.h"
 
 void swap_disk_init(void)
 {
