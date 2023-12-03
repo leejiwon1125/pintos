@@ -6,11 +6,10 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 
-#define SECTOR_NUM_IN_ONE_PAGE PGSIZE/BLOCK_SECTOR_SIZE
+#define SECTOR_NUM_IN_ONE_PAGE (PGSIZE / BLOCK_SECTOR_SIZE)
 
-struct block * swap_disk;
-struct bitmap * swap_disk_bitmap;   //false -> there is space in swap disk.
-struct lock swap_disk_bitmap_lock;
+struct block *swap_disk;
+struct bitmap *swap_disk_bitmap; // false -> there is space in swap disk.
 
 void swap_disk_init(void);
 void swap_in(void *, size_t);

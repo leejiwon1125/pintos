@@ -4,35 +4,35 @@
 #include <hash.h>
 #include "filesys/file.h"
 #include "threads/thread.h"
+#include "vm/swap.h"
 
-enum current_location_for_page 
-  {
+unsigned sup_page_table_hash_function(const struct hash_elem *, void *);
+bool sup_page_table_less_func(const struct hash_elem *, const struct hash_elem *, void *);
+void sup_page_table_destruct_func(struct hash_elem *, void *);
+void free_sup_page_table(struct hash *);
+
+enum current_location_for_page
+{
     InMemory,
     InFile,
     InSwapDisk
-  };
+};
 
 struct sup_page_table_entry
-  {
-    // for lazy loading
-    struct file * file;
+{
+    struct file *file;
     off_t ofs;
-    void * VA_for_page;
-    uint32_t page_read_bytes;
-    uint32_t page_zero_bytes;
+    void *spte_VA_for_page;
+    uint32_t read_bytes;
+    uint32_t zero_bytes;
     bool writable;
 
-    // for evcition situation
-    bool go_to_swap_disk_when_evict;
     enum current_location_for_page current_page_location;
-    size_t frame_idx_in_swap_disk;
+    bool go_to_swap_disk_when_evict;
 
-    struct hash_elem spt_entry_elem;
-  };
+    off_t frame_idx_in_swap_disk;
 
-unsigned sup_page_table_hash_function (const struct hash_elem *, void *);
-bool sup_page_table_less_func (const struct hash_elem *, const struct hash_elem *, void *);
-void sup_page_table_destruct_func (struct hash_elem *, void *);
-struct hash_elem * sup_page_table_find_hash_elem(struct hash *, void *);
+    struct hash_elem elem;
+};
 
 #endif /* vm/spt.h */

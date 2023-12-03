@@ -1,37 +1,36 @@
 #include "vm/spt.h"
 
-unsigned sup_page_table_hash_function (const struct hash_elem * e, void * aux)
+// helper function for hash_init
+unsigned
+sup_page_table_hash_function(const struct hash_elem *e, void *aux UNUSED)
 {
-    struct sup_page_table_entry * spt_entry = hash_entry (e, struct sup_page_table_entry, spt_entry_elem);
-    unsigned hash = hash_int((int)(spt_entry -> VA_for_page));
+    struct sup_page_table_entry *spt_entry = hash_entry(e, struct sup_page_table_entry, elem);
+    unsigned hash = hash_int((int)(spt_entry->spte_VA_for_page));
     return hash;
 }
 
-bool sup_page_table_less_func (const struct hash_elem * a, const struct hash_elem * b, void * aux)
+// helper function for hash_init
+bool sup_page_table_less_func(const struct hash_elem *e1, const struct hash_elem *e2, void *aux UNUSED)
 {
-    struct sup_page_table_entry * spt_entry_a = hash_entry (a, struct sup_page_table_entry, spt_entry_elem);
-    struct sup_page_table_entry * spt_entry_b = hash_entry (b, struct sup_page_table_entry, spt_entry_elem);
-    return (spt_entry_a -> VA_for_page) < (spt_entry_b -> VA_for_page);
+    void *vaddr1 = hash_entry(e1, struct sup_page_table_entry, elem)->spte_VA_for_page;
+    void *vaddr2 = hash_entry(e2, struct sup_page_table_entry, elem)->spte_VA_for_page;
+    return vaddr1 < vaddr2; // ascending order
 }
 
-void sup_page_table_destruct_func (struct hash_elem * e, void * aux)
+void sup_page_table_destruct_func(struct hash_elem *e, void *aux UNUSED)
 {
-    // need to free memory that used for buckets' element's element
-    // type of...
-    // buckets: array / buckets' element: struct list / buckets' element's element: struct sup_page_table_entry
-    struct sup_page_table_entry * spt_entry = hash_entry (e, struct sup_page_table_entry, spt_entry_elem);
-    hash_delete(&(thread_current() -> sup_page_table), e);
-    if ( spt_entry ->current_page_location == InSwapDisk)
+    struct sup_page_table_entry *s_elem_to_free = hash_entry(e, struct sup_page_table_entry, elem);
+    hash_delete(&thread_current()->sup_page_table, e);
+    if (s_elem_to_free->current_page_location == InSwapDisk)
     {
-        swap_disk_free (spt_entry->frame_idx_in_swap_disk);
+        ASSERT(bitmap_scan(swap_disk_bitmap, s_elem_to_free->frame_idx_in_swap_disk, 1, true) == s_elem_to_free->frame_idx_in_swap_disk);
+        bitmap_flip(swap_disk_bitmap, s_elem_to_free->frame_idx_in_swap_disk);
     }
-    free(spt_entry);
+    free(s_elem_to_free);
 }
 
-struct hash_elem * sup_page_table_find_hash_elem(struct hash * spt, void * VA_for_page)
+// free sup_page_table
+void free_sup_page_table(struct hash *sup_page_table_to_free)
 {
-    struct sup_page_table_entry spt_entry;
-    spt_entry.VA_for_page = VA_for_page;
-    struct hash_elem * spt_hash_elem = hash_find(spt, &(spt_entry.spt_entry_elem));
-    return spt_hash_elem;
+    hash_destroy(sup_page_table_to_free, sup_page_table_destruct_func);
 }
